@@ -1,4 +1,5 @@
 # ovs-installer
+This is installer script of [Open vSwitch](https://github.com/openvswitch/ovs)(v2.4.0, v2.3.2, v2.3.1).
 
 Currently supported:
 - CentOS(6.6 or later)
