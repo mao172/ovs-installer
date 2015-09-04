@@ -1,5 +1,7 @@
 #! /bin/sh -x
 
+script_root=$(cd $(dirname $0) && pwd)
+
 VERSION='2.3.2'
 OVS_NAME="openvswitch-${VERSION}"
 
@@ -8,7 +10,11 @@ yum install wget -y
 
 adduser ovswitch
 
-su - ovswitch -c  "curl -L https://raw.githubusercontent.com/mao172/ovs-installer/master/lib/build.sh | bash -s -- -v ${VERSION}"
+if [ -f ${script_root}/lib/build.sh ]; then
+  bash ${script_root}/lib/build.sh -v ${VERSION}
+else
+  su - ovswitch -c  "curl -L https://raw.githubusercontent.com/mao172/ovs-installer/master/lib/build.sh | bash -s -- -v ${VERSION}"
+fi
 
 # yum install /home/ovswitch/rpmbuild/RPMS/x86_64/${OVS_NAME}-1.x86_64.rpm -y
 # systemctl start openvswitch
