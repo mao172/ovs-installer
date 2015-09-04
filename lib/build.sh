@@ -11,17 +11,6 @@ check_platform() {
 
 }
 
-check_options() {
-  VERSION=2.3.2
-
-  while getopts v: OPT
-  do
-    case $opt in
-      "v" ) VERSION="$OPTARG";;
-    esac
-  done
-}
-
 ge() {
   ret=$(echo $1 $2 | awk '{printf ("%d", $1>=$2)}')
   test ${ret} -eq 1
@@ -57,11 +46,20 @@ build_rpm() {
   rpmbuild -bb --without check rhel/openvswitch.spec || return $?
 
   if ge ${platform_version} 6 && lt ${platform_version} 7;  then
+    cp rhel/openvswitch-kmod.files ../
     rpmbuild -bb rhel/openvswitch-kmod-rhel6.spec || return $?
   fi
 }
 
-check_options
+VERSION=2.3.2
+
+while getopts v: OPT
+do
+  case $OPT in
+    "v" ) VERSION="$OPTARG";;
+  esac
+done
+
 check_platform
 
 if [ ${platform_family} == "rhel" ]; then
