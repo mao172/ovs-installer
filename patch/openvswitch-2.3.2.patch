@@ -1,0 +1,147 @@
+diff -aurN openvswitch-2.3.2.org/acinclude.m4 openvswitch-2.3.2/acinclude.m4
+--- openvswitch-2.3.2.org/acinclude.m4	2015-06-19 04:32:47.000000000 +0900
++++ openvswitch-2.3.2/acinclude.m4	2015-09-03 10:26:56.804999646 +0900
+@@ -281,8 +281,10 @@
+   OVS_GREP_IFELSE([$KSRC/include/linux/if_vlan.h], [vlan_set_encap_proto])
+ 
+   OVS_GREP_IFELSE([$KSRC/include/linux/in.h], [ipv4_is_multicast])
++  OVS_GREP_IFELSE([$KSRC/include/linux/in.h], [proto_ports_offset])
+   OVS_GREP_IFELSE([$KSRC/include/net/ip.h], [__ip_select_ident.*dst_entry],
+                   [OVS_DEFINE([HAVE_IP_SELECT_IDENT_USING_DST_ENTRY])])
++  OVS_GREP_IFELSE([$KSRC/include/net/ip.h], [ip_is_fragment])
+ 
+   OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [dev_disable_lro])
+   OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [dev_get_stats])
+@@ -291,6 +293,8 @@
+   OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [can_checksum_protocol])
+   OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [netdev_features_t])
+   OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [pcpu_sw_netstats])
++  OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [netdev_rx_handler_register])
++  OVS_GREP_IFELSE([$KSRC/include/linux/netdevice.h], [net_device_extended])
+ 
+   OVS_GREP_IFELSE([$KSRC/include/linux/random.h], [prandom_u32])
+ 
+@@ -333,7 +337,8 @@
+   OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [skb_clear_hash])
+   OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [int.skb_zerocopy(],
+                   [OVS_DEFINE([HAVE_SKB_ZEROCOPY])])
+-  OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [l4_rxhash])
++  OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [u8.*l4_rxhash],
++                  [OVS_DEFINE([HAVE_L4_RXHASH])])
+ 
+   OVS_GREP_IFELSE([$KSRC/include/linux/types.h], [bool],
+                   [OVS_DEFINE([HAVE_BOOL_TYPE])])
+diff -aurN openvswitch-2.3.2.org/datapath/linux/compat/dev-openvswitch.c openvswitch-2.3.2/datapath/linux/compat/dev-openvswitch.c
+--- openvswitch-2.3.2.org/datapath/linux/compat/dev-openvswitch.c	2015-06-19 04:32:47.000000000 +0900
++++ openvswitch-2.3.2/datapath/linux/compat/dev-openvswitch.c	2015-09-03 10:09:36.410999442 +0900
+@@ -33,7 +33,7 @@
+ 
+ #endif /* HAVE_DEV_DISABLE_LRO */
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) || \
++#if !defined HAVE_NETDEV_RX_HANDLER_REGISTER || \
+     defined HAVE_RHEL_OVS_HOOK
+ 
+ static int nr_bridges;
+diff -aurN openvswitch-2.3.2.org/datapath/linux/compat/include/linux/in.h openvswitch-2.3.2/datapath/linux/compat/include/linux/in.h
+--- openvswitch-2.3.2.org/datapath/linux/compat/include/linux/in.h	2015-04-05 08:58:22.000000000 +0900
++++ openvswitch-2.3.2/datapath/linux/compat/include/linux/in.h	2015-09-03 10:04:56.556000515 +0900
+@@ -4,7 +4,7 @@
+ #include_next <linux/in.h>
+ 
+ #include <linux/module.h>
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
++#ifndef HAVE_PROTO_PORTS_OFFSET
+ static inline int proto_ports_offset(int proto)
+ {
+ 	switch (proto) {
+diff -aurN openvswitch-2.3.2.org/datapath/linux/compat/include/linux/netdevice.h openvswitch-2.3.2/datapath/linux/compat/include/linux/netdevice.h
+--- openvswitch-2.3.2.org/datapath/linux/compat/include/linux/netdevice.h	2015-06-19 04:32:47.000000000 +0900
++++ openvswitch-2.3.2/datapath/linux/compat/include/linux/netdevice.h	2015-09-03 10:11:03.888004973 +0900
+@@ -22,7 +22,7 @@
+ extern void dev_disable_lro(struct net_device *dev);
+ #endif
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) || \
++#if !defined HAVE_NETDEV_RX_HANDLER_REGISTER || \
+     defined HAVE_RHEL_OVS_HOOK
+ 
+ #ifdef HAVE_RHEL_OVS_HOOK
+diff -aurN openvswitch-2.3.2.org/datapath/linux/compat/include/net/ip.h openvswitch-2.3.2/datapath/linux/compat/include/net/ip.h
+--- openvswitch-2.3.2.org/datapath/linux/compat/include/net/ip.h	2015-06-19 04:32:47.000000000 +0900
++++ openvswitch-2.3.2/datapath/linux/compat/include/net/ip.h	2015-09-03 10:27:36.385999602 +0900
+@@ -5,7 +5,7 @@
+ 
+ #include <linux/version.h>
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
++#ifndef HAVE_IP_IS_FRAGMENT
+ static inline bool ip_is_fragment(const struct iphdr *iph)
+ {
+ 	return (iph->frag_off & htons(IP_MF | IP_OFFSET)) != 0;
+diff -aurN openvswitch-2.3.2.org/datapath/vport-netdev.c openvswitch-2.3.2/datapath/vport-netdev.c
+--- openvswitch-2.3.2.org/datapath/vport-netdev.c	2015-06-19 04:32:47.000000000 +0900
++++ openvswitch-2.3.2/datapath/vport-netdev.c	2015-09-03 10:16:02.231999981 +0900
+@@ -36,7 +36,8 @@
+ 
+ static void netdev_port_receive(struct vport *vport, struct sk_buff *skb);
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39) || \
++    defined HAVE_NETDEV_RX_HANDLER_REGISTER
+ /* Called with rcu_read_lock and bottom-halves disabled. */
+ static rx_handler_result_t netdev_frame_hook(struct sk_buff **pskb)
+ {
+@@ -253,7 +254,7 @@
+ /* Returns null if this device is not attached to a datapath. */
+ struct vport *ovs_netdev_get_vport(struct net_device *dev)
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36) || \
++#if defined HAVE_NETDEV_RX_HANDLER_REGISTER || \
+     defined HAVE_RHEL_OVS_HOOK
+ #if IFF_OVS_DATAPATH != 0
+ 	if (likely(dev->priv_flags & IFF_OVS_DATAPATH))
+@@ -263,8 +264,13 @@
+ #ifdef HAVE_RHEL_OVS_HOOK
+ 		return (struct vport *)rcu_dereference_rtnl(dev->ax25_ptr);
+ #else
++#ifdef HAVE_NET_DEVICE_EXTENDED
++		return (struct vport *)
++			rcu_dereference_rtnl(netdev_extended(dev)->rx_handler_data);
++#else
+ 		return (struct vport *)rcu_dereference_rtnl(dev->rx_handler_data);
+ #endif
++#endif
+ 	else
+ 		return NULL;
+ #else
+@@ -280,7 +286,7 @@
+ 	.send		= netdev_send,
+ };
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36) && \
++#if !defined HAVE_NETDEV_RX_HANDLER_REGISTER && \
+     !defined HAVE_RHEL_OVS_HOOK
+ /*
+  * Enforces, mutual exclusion with the Linux bridge module, by declaring and
+diff -aurN openvswitch-2.3.2.org/rhel/openvswitch-kmod-rhel6.spec openvswitch-2.3.2/rhel/openvswitch-kmod-rhel6.spec
+--- openvswitch-2.3.2.org/rhel/openvswitch-kmod-rhel6.spec	2015-06-19 04:33:13.000000000 +0900
++++ openvswitch-2.3.2/rhel/openvswitch-kmod-rhel6.spec	2015-09-03 09:42:20.209998775 +0900
+@@ -21,6 +21,7 @@
+ URL:            http://openvswitch.org/
+ Source0:        %{oname}-%{version}.tar.gz
+ Source1:        %{oname}-kmod.files
++Patch0:         %{oname}-%{version}.patch
+ BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+ BuildRequires:  %kernel_module_package_buildreqs
+ 
+@@ -44,6 +45,9 @@
+ %prep
+ 
+ %setup -n %{oname}-%{version}
++%patch0 -p1
++rm configure
++autoreconf
+ cat > %{oname}.conf << EOF
+ override %{oname} * extra/%{oname}
+ override %{oname} * weak-updates/%{oname}
